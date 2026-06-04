@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/jclement/splitshot/internal/pdf"
 	"github.com/jclement/splitshot/internal/slip039"
 	"github.com/jclement/splitshot/internal/taglines"
@@ -24,52 +26,82 @@ type shareOutput struct {
 }
 
 // emitSecret echoes the secret with a loud warning. Interactive sessions get it
-// on stdout (styled); piped runs get it on stderr so stdout stays share-only.
+// in a styled box on stdout; piped runs get it plain on stderr so stdout stays
+// share-only.
 func emitSecret(cmd *cobra.Command, secretText string) {
-	out := cmd.OutOrStdout()
-	w := out
-	if !isTerminal(out) {
-		w = cmd.ErrOrStderr()
+	if !isTerminal(cmd.OutOrStdout()) {
+		w := cmd.ErrOrStderr()
+		t := newTheme(w)
+		fmt.Fprintln(w, t.warning.Render("Your secret (shown once — store or use it now, it will NOT be displayed again):"))
+		fmt.Fprintln(w, "  "+t.secret.Render(secretText))
+		fmt.Fprintln(w)
+		return
 	}
-	t := newTheme(w)
-	fmt.Fprintln(w, t.warning.Render("Your secret (shown once — store or use it now, it will NOT be displayed again):"))
-	fmt.Fprintln(w, "  "+t.secret.Render(secretText))
-	fmt.Fprintln(w)
+	out := cmd.OutOrStdout()
+	t := newTheme(out)
+	fmt.Fprintln(out, t.warning.Render("Your secret — shown once. Store or use it now; it will NOT be shown again."))
+	fmt.Fprintln(out, t.secretBox.Render(t.secret.Render(secretText)))
+	fmt.Fprintln(out)
 }
 
-// emitShares writes the shares and, if requested, the PDF sheets.
+// renderWordGrid lays the words out in an aligned, numbered grid, row-major,
+// using as many columns as the terminal width allows (fewer rows on wider
+// terminals). Numbers are faint, words accent-colored; each cell is a fixed
+// display width so columns line up even with color codes.
+func renderWordGrid(t theme, words []string, width int) string {
+	// Cell holds "NN: " (4) + a word (≤8 chars in SLIP-0039) + a little gap.
+	const cellWidth = 14
+	const indent = 2
+	cols := (width - indent) / cellWidth
+	if cols < 1 {
+		cols = 1
+	}
+	if cols > len(words) {
+		cols = len(words)
+	}
+	cell := t.r.NewStyle().Width(cellWidth)
+
+	var b strings.Builder
+	for i := 0; i < len(words); i += cols {
+		var rowCells []string
+		for c := 0; c < cols && i+c < len(words); c++ {
+			n := i + c
+			text := t.gridNum.Render(fmt.Sprintf("%02d:", n+1)) + " " + t.share.Render(words[n])
+			rowCells = append(rowCells, cell.Render(text))
+		}
+		b.WriteString(strings.Repeat(" ", indent) + lipgloss.JoinHorizontal(lipgloss.Top, rowCells...) + "\n")
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// emitShares writes the shares and, if requested, the PDF sheets. Piped output
+// is bare (one mnemonic per line, so it feeds straight into combine); a terminal
+// gets a labeled, numbered, width-adaptive grid per share.
 func emitShares(cmd *cobra.Command, info BuildInfo, shares []slip039.Share, threshold, total int, opts shareOutput) error {
 	out := cmd.OutOrStdout()
-	interactive := isTerminal(out)
 
-	if interactive {
+	if !isTerminal(out) {
+		for _, s := range shares {
+			fmt.Fprintln(out, s.Mnemonic())
+		}
+	} else {
 		t := newTheme(out)
+		width := terminalWidth(out)
 		fmt.Fprintln(out, t.heading.Render(fmt.Sprintf("Shares — any %d of %d recover the secret:", threshold, total)))
-	}
-
-	for i, s := range shares {
-		writeOneShare(cmd, i, len(shares), s, interactive)
+		fmt.Fprintln(out)
+		for i, s := range shares {
+			words := s.Words()
+			fmt.Fprintln(out, t.label.Render(fmt.Sprintf("Share %d of %d", i+1, len(shares)))+
+				t.gridNum.Render(fmt.Sprintf("  (%d words)", len(words))))
+			fmt.Fprintln(out, renderWordGrid(t, words, width))
+			fmt.Fprintln(out)
+		}
 	}
 
 	if opts.pdfDir != "" {
 		return writePDFs(cmd, info, shares, threshold, total, opts)
 	}
 	return nil
-}
-
-// writeOneShare prints a single share mnemonic. Piped output is bare (one share
-// per line, no labels, so it feeds straight into combine); interactive output
-// is labeled and styled.
-func writeOneShare(cmd *cobra.Command, idx, count int, s slip039.Share, interactive bool) {
-	out := cmd.OutOrStdout()
-	if !interactive {
-		fmt.Fprintln(out, s.Mnemonic())
-		return
-	}
-	t := newTheme(out)
-	fmt.Fprintln(out, t.label.Render(fmt.Sprintf("Share %d of %d", idx+1, count)))
-	fmt.Fprintln(out, "  "+t.share.Render(s.Mnemonic()))
-	fmt.Fprintln(out)
 }
 
 // writePDFs renders one backup sheet per share into opts.pdfDir (0600 files).

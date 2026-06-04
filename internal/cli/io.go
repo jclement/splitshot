@@ -40,6 +40,22 @@ func isTerminal(w io.Writer) bool {
 	return term.IsTerminal(int(f.Fd()))
 }
 
+// defaultTerminalWidth is assumed when the real width can't be measured (a
+// non-TTY writer, or the forced-interactive test path).
+const defaultTerminalWidth = 80
+
+// terminalWidth returns the column width of w if it's a real terminal, else a
+// sensible default. Used to lay the word grid out as wide as the terminal
+// allows (fewer rows on wide terminals).
+func terminalWidth(w io.Writer) int {
+	if f, ok := w.(*os.File); ok {
+		if width, _, err := term.GetSize(int(f.Fd())); err == nil && width > 0 {
+			return width
+		}
+	}
+	return defaultTerminalWidth
+}
+
 // readShareLines reads share strings from r, one per line. Blank lines, lines
 // beginning with '#' (comments), and pure separator lines ("---") are skipped,
 // so a lightly-annotated paste still parses.

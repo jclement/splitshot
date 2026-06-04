@@ -54,5 +54,5 @@ func emitRecoveredSecret(cmd *cobra.Command, secret []byte) {
 	}
 	t := newTheme(out)
 	fmt.Fprintln(out, t.success.Render("Recovered secret:"))
-	fmt.Fprintln(out, "  "+t.secret.Render(string(secret)))
+	fmt.Fprintln(out, t.secretBox.Render(t.secret.Render(string(secret))))
 }
