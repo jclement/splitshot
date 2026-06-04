@@ -1,0 +1,85 @@
+# mise drives every dev tool and task for splitshot. Tools here are NOT on the
+# global PATH — invoke them through `mise exec --` or, better, a `mise run` task.
+[tools]
+go = "latest"
+goreleaser = "latest"
+"go:honnef.co/go/tools/cmd/staticcheck" = "latest"
+"go:github.com/air-verse/air" = "latest"
+
+[env]
+# Single static binary, no C. Non-negotiable for this project.
+CGO_ENABLED = "0"
+
+[tasks.dev]
+description = "Rebuild on change (air) — handy while iterating on the CLI"
+run = "air"
+
+[tasks.build]
+description = "Production build of the splitshot binary into ./bin"
+run = """
+#!/bin/bash
+set -e
+CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=dev" -o bin/splitshot ./cmd/splitshot
+echo "Built bin/splitshot"
+"""
+
+[tasks.test]
+description = "Run all tests with the race detector and coverage"
+run = "go test -race -cover ./..."
+
+[tasks."test:unit"]
+description = "Unit tests only (alias of test — there is no other kind here)"
+run = "go test -race -cover ./..."
+
+[tasks.cover]
+description = "Generate an HTML coverage report into coverage.html"
+run = """
+#!/bin/bash
+set -e
+go test -covermode=atomic -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out | tail -1
+go tool cover -html=coverage.out -o coverage.html
+echo "Wrote coverage.html"
+"""
+
+[tasks.lint]
+description = "Vet + staticcheck — must be clean, zero warnings"
+run = """
+#!/bin/bash
+set -e
+go vet ./...
+staticcheck ./...
+"""
+
+[tasks.fmt]
+description = "Format all Go code"
+run = "go fmt ./..."
+
+[tasks."dev:reset"]
+description = "Blow away local build/coverage artifacts"
+run = "rm -rf bin/ tmp/ coverage.out coverage.html dist/"
+
+[tasks.release]
+description = "Bump version, tag, and push (triggers the GoReleaser workflow)"
+run = """
+#!/bin/bash
+set -e
+current=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+echo "Current: $current"
+major=$(echo $current | sed 's/v//' | cut -d. -f1)
+minor=$(echo $current | cut -d. -f2)
+patch=$(echo $current | cut -d. -f3)
+echo "  1) patch → v${major}.${minor}.$((patch+1))"
+echo "  2) minor → v${major}.$((minor+1)).0"
+echo "  3) major → v$((major+1)).0.0"
+read -p "Choice [1]: " c; c=${c:-1}
+case $c in
+  1) v="v${major}.${minor}.$((patch+1))" ;;
+  2) v="v${major}.$((minor+1)).0" ;;
+  3) v="v$((major+1)).0.0" ;;
+  *) echo "Invalid"; exit 1 ;;
+esac
+git tag -a "$v" -m "Release $v"
+read -p "Push $v? [Y/n]: " p; p=${p:-Y}
+[[ $p =~ ^[Yy]$ ]] && git push origin "$v"
+"""

@@ -1,0 +1,12 @@
+# Copy to fnox.local.toml (gitignored) to inject secrets from 1Password during
+# local development and release. splitshot itself needs no runtime secrets; the
+# only secret in play is the token GoReleaser uses to push the Homebrew formula.
+#
+# In CI this is provided as the GitHub Actions secret HOMEBREW_TAP_TOKEN.
+default_provider = "1Password"
+
+[providers.1Password]
+type = "1password"
+
+[secrets]
+HOMEBREW_TAP_TOKEN = {provider = "1Password", value = "op://Employee/splitshot/HOMEBREW_TAP_TOKEN"}

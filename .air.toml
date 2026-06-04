@@ -1,0 +1,9 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -ldflags=\"-X main.version=dev\" -o ./tmp/splitshot ./cmd/splitshot"
+bin = "./tmp/splitshot"
+include_ext = ["go", "txt"]
+exclude_dir = ["tmp", "bin", "dist", "testdata"]
+delay = 1000

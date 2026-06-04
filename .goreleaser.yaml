@@ -1,0 +1,53 @@
+version: 2
+project_name: splitshot
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/splitshot
+    binary: splitshot
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}} -X main.date={{.Date}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+brews:
+  - repository:
+      owner: jclement
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/jclement/splitshot"
+    description: "Generate secure secrets and split them with Shamir secret sharing (SLIP-0039)"
+    license: "MIT"
+    install: |
+      bin.install "splitshot"
+    test: |
+      system "#{bin}/splitshot", "version"
+
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--bundle=${signature}.sigstore.json"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude: ["^docs:", "^test:", "^ci:", "^chore:"]
+
+release:
+  prerelease: auto
