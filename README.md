@@ -15,7 +15,8 @@ official SLIP-0039 test vectors.
 - **Generate** a secure random secret and split it in one step (`gen`).
 - **Split** an existing secret (password, seed, key) into shares (`split`).
 - **Combine** a sufficient subset of shares back into the secret (`combine`).
-- **PDF** backup sheets: blank, fill-in-by-hand templates per share (`pdf`, or `--pdf`).
+- **PDF** backup sheets: blank fill-in-by-hand templates per share (`pdf`, or
+  `gen`/`split --pdf`); opt into printed words with `pdf -p`.
 
 Threshold semantics: `-n` is the number of shares **required** to recover (N),
 `-m` is the **total** number of shares produced (M). Constraint: `2 ≤ n ≤ m ≤ 16`.
@@ -67,7 +68,7 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 | `splitshot gen` | Generate a random secret and split it into N-of-M shares |
 | `splitshot split` | Split an existing secret (stdin or `--secret-file`) |
 | `splitshot combine` | Reconstruct a secret from share mnemonics on stdin |
-| `splitshot pdf` | Render blank PDF backup sheets from shares on stdin |
+| `splitshot pdf` | Generate blank backup-sheet templates (`-n`/`-m`/`-l`); `-p` reads a secret from stdin and prints filled sheets |
 | `splitshot version` | Print version and build info |
 
 ## Key flags
@@ -81,6 +82,9 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 | `--passphrase` | gen, split, combine | Optional passphrase (printable ASCII) protecting the secret | `""` |
 | `--pdf` | gen, split | Directory to write blank PDF backup sheets into | — |
 | `--show-secret` | gen, split | Echo the secret once (gen defaults on, split off) | — |
+| `-n, -m` | pdf | Threshold / total to label the sheets | — (required) |
+| `-l, --length` | pdf | Secret length the blank sheets are sized for (ignored with `-p`) | `32` |
+| `-p, --fill` | pdf | Read a secret from stdin, split it, and **print** the words onto the sheets | `false` |
 | `-o, --out` | pdf | Output directory for sheets | `.` |
 
 ## Security notes
@@ -93,8 +97,11 @@ straight into `combine`), while the secret, banners, and PDF notices go to
   shares recover a *different* (plausible) secret rather than failing — enabling
   deniable "decoy" secrets. There is no way to detect the right passphrase from
   the shares alone.
-- The **PDF never contains the words.** It is a blank handwriting template; only
-  the parameters (share number, threshold, Set ID) are printed.
+- **PDFs are blank by default.** A backup sheet is a handwriting template — only
+  the parameters (share number, threshold, Set ID) are printed, never the words.
+  The one exception is the explicit `pdf -p` mode, which prints the words onto
+  the sheets: convenient, but it puts the secret on paper and through your
+  printer, so only use it with a trusted/offline printer.
 - PDF files are written with `0600` permissions.
 - Recover on a **trusted, offline machine**. The recovered secret is the crown
   jewels; treat the terminal and shell history accordingly.

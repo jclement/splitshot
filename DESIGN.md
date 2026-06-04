@@ -38,7 +38,8 @@ Data flow:
 - `gen`: `secret.Generate` → bytes → `slip039.Split` → shares → render (+PDF).
 - `split`: read stdin/file → `slip039.Split` → shares → render (+PDF).
 - `combine`: read stdin → parse/dedupe shares → `slip039.Combine` → secret.
-- `pdf`: read stdin → parse shares → `pdf.Render` per share.
+- `pdf`: from `-n`/`-m`/`-l` flags → blank `pdf.Render` per sheet (no secret).
+  With `-p`: read secret from stdin → `slip039.Split` → `pdf.Render` with words.
 
 ## Project structure
 
@@ -91,12 +92,15 @@ testdata/slip39-vectors.json — official vectors, run in full by the test suite
    tests so the error paths are reachable). Character selection uses rejection
    sampling to eliminate modulo bias.
 
-6. **The PDF is a blank template.** The renderer is given only a word *count*,
-   never the words — so a backup sheet cannot leak the secret even by accident.
-   It prints the share number, the threshold, a Set ID (the SLIP-0039 identifier,
-   so sheets of one set are matchable), recovery instructions, and numbered empty
-   boxes to handwrite into. Core PDF fonts (Helvetica/Courier) keep the binary
-   free of embedded TTFs.
+6. **The PDF is a blank template by default.** In the default path the renderer
+   is given only a word *count*, never the words — so a backup sheet cannot leak
+   the secret. It prints the share number, the threshold, a Set ID (the SLIP-0039
+   identifier, so sheets of one set are matchable), recovery instructions, and
+   numbered empty boxes to handwrite into. The lone exception is the explicit
+   `pdf -p` mode, which reads a secret from stdin, splits it, and *prints* the
+   words into the boxes — opt-in only, for users who trust their printer. Core
+   PDF fonts (Helvetica/Courier) keep the binary free of embedded TTFs; text is
+   run through fpdf's cp1252 translator so non-ASCII punctuation renders cleanly.
 
 7. **TTY-aware output.** Lipgloss renderers are bound to the actual output
    writer, so a piped run emits plain, color-free, label-free shares on stdout

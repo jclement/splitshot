@@ -6,6 +6,14 @@ import (
 	"testing"
 )
 
+func filledWords(n int) []string {
+	w := make([]string, n)
+	for i := range w {
+		w[i] = "academic"
+	}
+	return w
+}
+
 func TestRenderProducesValidPDF(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -13,7 +21,8 @@ func TestRenderProducesValidPDF(t *testing.T) {
 	}{
 		{"blank 20-word", Sheet{Index: 1, Total: 3, Threshold: 2, SetID: "a1b2", WordCount: 20, Tagline: "trust no single sheet"}},
 		{"blank 33-word", Sheet{Index: 3, Total: 3, Threshold: 2, SetID: "a1b2", WordCount: 33}},
-		{"no count sizes to default", Sheet{Index: 1, Total: 1, Threshold: 1, SetID: ""}},
+		{"no count sizes to default (blank Set ID fill-in line)", Sheet{Index: 1, Total: 1, Threshold: 1, SetID: ""}},
+		{"filled 33-word", Sheet{Index: 2, Total: 3, Threshold: 2, SetID: "a1b2", Words: filledWords(33)}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

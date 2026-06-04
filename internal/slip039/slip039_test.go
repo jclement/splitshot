@@ -360,6 +360,23 @@ func TestShareFromMnemonicErrors(t *testing.T) {
 	}
 }
 
+func TestWordsPerShare(t *testing.T) {
+	// Known counts, and a cross-check against an actually-generated share.
+	cases := map[int]int{16: 20, 32: 33}
+	for length, want := range cases {
+		if got := WordsPerShare(length); got != want {
+			t.Fatalf("WordsPerShare(%d) = %d, want %d", length, got, want)
+		}
+		shares, err := Split(bytes.Repeat([]byte{1}, length), 2, 2, "", rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(shares[0].Words()); got != want {
+			t.Fatalf("generated share has %d words, WordsPerShare said %d", got, want)
+		}
+	}
+}
+
 // readRandom should surface short reads as errors.
 func TestReadRandomFailure(t *testing.T) {
 	if _, err := readRandom(io.LimitReader(&failingReader{remaining: 1}, 1), 4); err == nil {

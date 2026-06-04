@@ -17,18 +17,23 @@ var accent = struct{ r, g, b int }{37, 99, 235} // #2563EB
 
 // Sheet describes one share's backup page.
 //
-// Note what is deliberately absent: the share words themselves. A backup sheet
-// is a blank handwriting template — it carries only the parameters needed to
-// label and later recover the share (which share, how many total, how many
-// required, which set), plus enough empty boxes to write the words into by
-// hand. The renderer never receives secret material, so it cannot leak it.
+// By default a sheet is a blank handwriting template: it carries only the
+// parameters needed to label and later recover the share (which share, how many
+// total, how many required, which set) plus empty boxes to write the words into
+// by hand — no secret material reaches the renderer, so it cannot leak it.
+//
+// Words is the deliberate, opt-in exception: when non-empty, the share's words
+// are PRINTED into the boxes (the `pdf -p` "trust your printer" mode). Callers
+// must only populate it when the user has explicitly asked to put the secret on
+// paper.
 type Sheet struct {
-	Index     int    // human-facing share number (1-based)
-	Total     int    // M — total shares in the set
-	Threshold int    // N — shares required to recover
-	SetID     string // identifier fingerprint, matches sheets of one set
-	WordCount int    // how many blank word boxes to draw (20 or 33)
-	Tagline   string // a (sarcastic) tagline for the header
+	Index     int      // human-facing share number (1-based)
+	Total     int      // M — total shares in the set
+	Threshold int      // N — shares required to recover
+	SetID     string   // identifier fingerprint, matches sheets of one set
+	WordCount int      // how many blank word boxes to draw when Words is empty
+	Words     []string // if non-empty, PRINT these words into the boxes
+	Tagline   string   // a (sarcastic) tagline for the header
 }
 
 // Render produces a one-page PDF for a single share. version is stamped in the
@@ -64,7 +69,10 @@ func drawHeader(pdf *fpdf.Fpdf, s Sheet) {
 	if s.Tagline != "" {
 		pdf.SetTextColor(110, 110, 110)
 		pdf.SetFont("Helvetica", "I", 10)
-		pdf.CellFormat(0, 6, s.Tagline, "", 1, "L", false, 0, "")
+		// Core PDF fonts are cp1252; translate so any non-ASCII punctuation in a
+		// tagline renders correctly rather than as mojibake.
+		tr := pdf.UnicodeTranslatorFromDescriptor("")
+		pdf.CellFormat(0, 6, tr(s.Tagline), "", 1, "L", false, 0, "")
 	}
 
 	pdf.Ln(3)
@@ -81,9 +89,11 @@ func drawHeader(pdf *fpdf.Fpdf, s Sheet) {
 	pdf.SetFont("Helvetica", "", 12)
 	pdf.SetTextColor(60, 60, 60)
 	pdf.CellFormat(0, 7, fmt.Sprintf("Any %d of the %d shares are required to recover the secret.", s.Threshold, s.Total), "", 1, "L", false, 0, "")
+	pdf.SetFont("Courier", "", 10)
 	if s.SetID != "" {
-		pdf.SetFont("Courier", "", 10)
 		pdf.CellFormat(0, 7, "Set ID: "+s.SetID+"   (all shares in this set share this ID)", "", 1, "L", false, 0, "")
+	} else {
+		pdf.CellFormat(0, 7, "Set ID: ______________   (write the Set ID shown by splitshot)", "", 1, "L", false, 0, "")
 	}
 	pdf.Ln(2)
 }
@@ -117,22 +127,31 @@ func drawInstructions(pdf *fpdf.Fpdf, s Sheet) {
 	pdf.SetY(y + h + 5)
 }
 
-// drawWordGrid renders the numbered, empty word boxes in two columns for the
-// holder to handwrite their share words into. The boxes are always blank — the
-// renderer never has the words. Row height is computed so the whole grid fits
-// on the page regardless of the word count (18–33 words), and auto page-break
-// is disabled during the grid so the manual absolute positioning isn't
-// disrupted mid-draw.
+// drawWordGrid renders the numbered word boxes in two columns. By default the
+// boxes are empty (handwriting template); when s.Words is populated, the words
+// are printed inside them. Row height is computed so the whole grid fits on the
+// page regardless of the word count (20–33 words), and auto page-break is
+// disabled during the grid so the manual absolute positioning isn't disrupted
+// mid-draw.
 func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
+	filled := len(s.Words) > 0
+	count := s.WordCount
+	if filled {
+		count = len(s.Words)
+	}
+	if count <= 0 {
+		count = 20 // sensible default if neither words nor a count were supplied
+	}
+
 	pdf.SetTextColor(20, 20, 20)
 	pdf.SetFont("Helvetica", "B", 11)
-	pdf.CellFormat(0, 7, "Write your share words here, in order:", "", 1, "L", false, 0, "")
+	heading := "Write your share words here, in order:"
+	if filled {
+		heading = "Your share words (printed below). Store this sheet like the secret itself:"
+	}
+	pdf.CellFormat(0, 7, heading, "", 1, "L", false, 0, "")
 	pdf.Ln(1)
 
-	count := s.WordCount
-	if count <= 0 {
-		count = 20 // sensible default if a count wasn't supplied
-	}
 	const cols = 2
 	perCol := (count + cols - 1) / cols
 
@@ -151,6 +170,10 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 		rowH = 11
 	}
 	boxH := rowH - 2.5
+	wordFont := 11.0
+	if boxH < 5 {
+		wordFont = 9
+	}
 
 	const colW, gap, numW = 84.0, 11.0, 10.0
 	for i := 0; i < count; i++ {
@@ -167,6 +190,13 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 		pdf.SetDrawColor(170, 170, 170)
 		pdf.SetLineWidth(0.3)
 		pdf.RoundedRect(x+numW, y, colW-numW, boxH, 1.5, "1234", "D")
+
+		if filled && i < len(s.Words) {
+			pdf.SetXY(x+numW+2, y)
+			pdf.SetFont("Courier", "", wordFont)
+			pdf.SetTextColor(20, 20, 20)
+			pdf.CellFormat(colW-numW-3, boxH, s.Words[i], "", 0, "L", false, 0, "")
+		}
 	}
 	pdf.SetY(startY + float64(perCol)*rowH + 4)
 }

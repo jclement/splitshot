@@ -229,8 +229,7 @@ func TestPDFDirCreationFails(t *testing.T) {
 	if _, _, err := run(t, "", "gen", "-n", "2", "-m", "3", "--pdf", badDir); err == nil {
 		t.Fatal("expected gen --pdf mkdir error")
 	}
-	out, _, _ := run(t, "sixteen-byte-key", "split", "-n", "2", "-m", "2")
-	if _, _, err := run(t, out, "pdf", "-o", badDir); err == nil {
+	if _, _, err := run(t, "", "pdf", "-n", "2", "-m", "2", "-o", badDir); err == nil {
 		t.Fatal("expected pdf -o mkdir error")
 	}
 }
@@ -252,10 +251,9 @@ func TestCombineWrongPassphraseDiffers(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFCommand(t *testing.T) {
-	secret := "sixteen-byte-key"
-	out, _, _ := run(t, secret, "split", "-n", "2", "-m", "3")
 	dir := t.TempDir()
-	_, _, err := run(t, out, "pdf", "-o", dir)
+	// Flag-driven, no stdin: M blank sheets sized for a 32-byte secret.
+	_, _, err := run(t, "", "pdf", "-n", "2", "-m", "3", "-l", "32", "-o", dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,11 +261,48 @@ func TestPDFCommand(t *testing.T) {
 	if len(entries) != 3 {
 		t.Fatalf("expected 3 PDFs, got %d", len(entries))
 	}
+	for _, e := range entries {
+		info, _ := e.Info()
+		if info.Mode().Perm() != 0o600 {
+			t.Fatalf("PDF %s has perms %o, want 0600", e.Name(), info.Mode().Perm())
+		}
+	}
 }
 
 func TestPDFCommandErrors(t *testing.T) {
-	if _, _, err := run(t, "garbage line\n", "pdf"); err == nil {
-		t.Fatal("expected parse error")
+	cases := []struct {
+		stdin string
+		args  []string
+	}{
+		{"", []string{"pdf", "-m", "3"}},                           // missing threshold
+		{"", []string{"pdf", "-n", "2"}},                           // missing shares
+		{"", []string{"pdf", "-n", "5", "-m", "3"}},                // threshold > total
+		{"", []string{"pdf", "-n", "1", "-m", "3"}},                // threshold < 2
+		{"", []string{"pdf", "-n", "2", "-m", "3", "-l", "15"}},    // odd length
+		{"", []string{"pdf", "-n", "2", "-m", "3", "-l", "8"}},     // length < 16
+		{"", []string{"pdf", "-p", "-n", "2", "-m", "3"}},          // -p with empty stdin
+		{"too short", []string{"pdf", "-p", "-n", "2", "-m", "3"}}, // -p with sub-16-byte secret
+	}
+	for _, c := range cases {
+		if _, _, err := run(t, c.stdin, c.args...); err == nil {
+			t.Fatalf("expected error for args %v", c.args)
+		}
+	}
+}
+
+func TestPDFFillMode(t *testing.T) {
+	dir := t.TempDir()
+	// -p reads the secret from stdin, splits it, and prints filled sheets.
+	_, errb, err := run(t, "a-32-byte-secret-exactly-here!!!", "pdf", "-p", "-n", "2", "-m", "3", "-o", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 PDFs, got %d", len(entries))
+	}
+	if !strings.Contains(errb, "FILLED") {
+		t.Fatalf("expected a 'FILLED' warning on stderr, got %q", errb)
 	}
 }
 

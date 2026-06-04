@@ -15,6 +15,15 @@ import (
 // sole secret, and keeps the CLI snappy.
 const defaultIterationExponent = 1
 
+// WordsPerShare reports how many mnemonic words each share will have when a
+// secret of secretLenBytes is split. The count depends only on the byte length
+// (the share value is the same length as the secret), not on the threshold or
+// share count — so callers such as blank PDF templates can size their word
+// boxes without generating anything. Example: 16→20, 32→33.
+func WordsPerShare(secretLenBytes int) int {
+	return metadataLengthWords + bitsToWords(secretLenBytes*8)
+}
+
 // Split encrypts secret under passphrase and splits it into `total` shares of
 // which any `threshold` reconstruct it. Randomness (identifier + Shamir
 // coefficients) is drawn from rand; pass crypto/rand.Reader in production.
