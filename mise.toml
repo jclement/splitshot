@@ -4,15 +4,14 @@
 go = "latest"
 goreleaser = "latest"
 "go:honnef.co/go/tools/cmd/staticcheck" = "latest"
-"go:github.com/air-verse/air" = "latest"
 
 [env]
 # Single static binary, no C. Non-negotiable for this project.
 CGO_ENABLED = "0"
 
 [tasks.dev]
-description = "Rebuild on change (air) — handy while iterating on the CLI"
-run = "air"
+description = "Build and run the CLI from source (e.g. mise run dev -- gen -n 2 -m 3)"
+run = "go run ./cmd/splitshot"
 
 [tasks.build]
 description = "Production build of the splitshot binary into ./bin"

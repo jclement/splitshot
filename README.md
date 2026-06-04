@@ -103,7 +103,7 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 
 | Command | What it does |
 |---------|-------------|
-| `mise install` | Install all tools (Go, goreleaser, staticcheck, air) |
+| `mise install` | Install all tools (Go, goreleaser, staticcheck) |
 | `mise run test` | Run all tests with the race detector and coverage |
 | `mise run cover` | Write an HTML coverage report (`coverage.html`) |
 | `mise run lint` | `go vet` + `staticcheck` (must be clean) |

@@ -11,8 +11,7 @@ coverage.html
 out/
 *.pdf
 
-# Local secrets (NEVER commit)
-fnox.local.toml
+# Local mise overrides (NEVER commit)
 mise.local.toml
 
 # IDE
