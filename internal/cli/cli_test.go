@@ -5,7 +5,9 @@
 package cli
 
 import (
+	"bytes"
 	"crypto/rand"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,20 +137,34 @@ func TestGenErrors(t *testing.T) {
 }
 
 func TestGenWritesPDFs(t *testing.T) {
-	dir := t.TempDir()
-	_, _, err := run(t, "", "gen", "-n", "2", "-m", "3", "--pdf", dir)
+	path := filepath.Join(t.TempDir(), "backup.pdf")
+	_, _, err := run(t, "", "gen", "-n", "2", "-m", "3", "--pdf", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 PDFs, got %d", len(entries))
+	assertPDFPages(t, path, 3)
+}
+
+// assertPDFPages checks that path is a single 0600 PDF with the expected page
+// count (fpdf records it as "/Count N" in the page tree).
+func assertPDFPages(t *testing.T, path string, pages int) {
+	t.Helper()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat %s: %v", path, err)
 	}
-	for _, e := range entries {
-		info, _ := e.Info()
-		if info.Mode().Perm() != 0o600 {
-			t.Fatalf("PDF %s has perms %o, want 0600", e.Name(), info.Mode().Perm())
-		}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("PDF %s has perms %o, want 0600", path, info.Mode().Perm())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(data, []byte("%PDF")) {
+		t.Fatal("not a PDF")
+	}
+	if !bytes.Contains(data, []byte(fmt.Sprintf("/Count %d", pages))) {
+		t.Fatalf("expected a %d-page PDF (/Count %d)", pages, pages)
 	}
 }
 
@@ -241,12 +257,12 @@ func TestPDFDirCreationFails(t *testing.T) {
 	if err := os.WriteFile(file, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	badDir := filepath.Join(file, "subdir") // can't mkdir under a file
+	badPath := filepath.Join(file, "subdir", "backup.pdf") // can't mkdir under a file
 
-	if _, _, err := run(t, "", "gen", "-n", "2", "-m", "3", "--pdf", badDir); err == nil {
+	if _, _, err := run(t, "", "gen", "-n", "2", "-m", "3", "--pdf", badPath); err == nil {
 		t.Fatal("expected gen --pdf mkdir error")
 	}
-	if _, _, err := run(t, "", "pdf", "-n", "2", "-m", "2", "-o", badDir); err == nil {
+	if _, _, err := run(t, "", "pdf", "-n", "2", "-m", "2", "-o", badPath); err == nil {
 		t.Fatal("expected pdf -o mkdir error")
 	}
 }
@@ -268,22 +284,13 @@ func TestCombineWrongPassphraseDiffers(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestPDFCommand(t *testing.T) {
-	dir := t.TempDir()
-	// Flag-driven, no stdin: M blank sheets sized for a 32-byte secret.
-	_, _, err := run(t, "", "pdf", "-n", "2", "-m", "3", "-l", "32", "-o", dir)
+	path := filepath.Join(t.TempDir(), "blank.pdf")
+	// Flag-driven, no stdin: a single 3-page blank PDF sized for a 32-byte secret.
+	_, _, err := run(t, "", "pdf", "-n", "2", "-m", "3", "-l", "32", "-o", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 PDFs, got %d", len(entries))
-	}
-	for _, e := range entries {
-		info, _ := e.Info()
-		if info.Mode().Perm() != 0o600 {
-			t.Fatalf("PDF %s has perms %o, want 0600", e.Name(), info.Mode().Perm())
-		}
-	}
+	assertPDFPages(t, path, 3)
 }
 
 func TestPDFCommandErrors(t *testing.T) {
@@ -306,16 +313,13 @@ func TestPDFCommandErrors(t *testing.T) {
 }
 
 func TestPDFFillMode(t *testing.T) {
-	dir := t.TempDir()
-	// -p reads the secret from stdin, splits it, and prints filled sheets.
-	_, errb, err := run(t, "a-32-byte-secret-exactly-here!!!", "pdf", "-p", "-n", "2", "-m", "3", "-o", dir)
+	path := filepath.Join(t.TempDir(), "filled.pdf")
+	// -p reads the secret from stdin, splits it, and prints a filled multi-page PDF.
+	_, errb, err := run(t, "a-32-byte-secret-exactly-here!!!", "pdf", "-p", "-n", "2", "-m", "3", "-o", path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, _ := os.ReadDir(dir)
-	if len(entries) != 3 {
-		t.Fatalf("expected 3 PDFs, got %d", len(entries))
-	}
+	assertPDFPages(t, path, 3)
 	if !strings.Contains(errb, "FILLED") {
 		t.Fatalf("expected a 'FILLED' warning on stderr, got %q", errb)
 	}

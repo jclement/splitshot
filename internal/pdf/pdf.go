@@ -12,8 +12,30 @@ import (
 	"github.com/go-pdf/fpdf"
 )
 
-// accent is the splitshot blue used for headers and rules (RGB).
-var accent = struct{ r, g, b int }{37, 99, 235} // #2563EB
+// Retro / Turbo-Vision-ish palette: monospace type, black borders, grey shaded
+// panels, an inverse title bar. Mostly greyscale with one dark "chrome" tone.
+type rgb struct{ r, g, b int }
+
+var (
+	cInk    = rgb{24, 24, 24}    // near-black: borders, body text
+	cBarBg  = rgb{26, 28, 38}    // title bar / heading-tab background (dark)
+	cBarTx  = rgb{240, 240, 240} // text on the dark bar (light)
+	cPanel  = rgb{224, 224, 224} // shaded panel fill (grey)
+	cBoxFil = rgb{245, 245, 245} // word-box fill (very light grey)
+	cDim    = rgb{110, 110, 110} // secondary grey text
+	cRule   = rgb{150, 150, 150} // grey rules / box borders
+)
+
+func setDraw(pdf *fpdf.Fpdf, c rgb) { pdf.SetDrawColor(c.r, c.g, c.b) }
+func setFill(pdf *fpdf.Fpdf, c rgb) { pdf.SetFillColor(c.r, c.g, c.b) }
+func setText(pdf *fpdf.Fpdf, c rgb) { pdf.SetTextColor(c.r, c.g, c.b) }
+
+// Page geometry (mm, Letter, 18mm margins).
+const (
+	pageLeft  = 18.0
+	pageRight = 197.0
+	pageWidth = pageRight - pageLeft // 179
+)
 
 // Sheet describes one share's backup page.
 //
@@ -39,22 +61,33 @@ type Sheet struct {
 // Render produces a one-page PDF for a single share. version is stamped in the
 // footer so a recovered-from-PDF user knows which tool wrote it.
 func Render(s Sheet, version string) ([]byte, error) {
-	if s.Total < 1 || s.Threshold < 1 || s.Index < 1 || s.Index > s.Total {
-		return nil, fmt.Errorf("invalid sheet: index %d of %d, threshold %d", s.Index, s.Total, s.Threshold)
+	return RenderAll([]Sheet{s}, version)
+}
+
+// RenderAll produces a single PDF with one page per sheet — the whole backup
+// set in one file. version is stamped in each footer.
+func RenderAll(sheets []Sheet, version string) ([]byte, error) {
+	if len(sheets) == 0 {
+		return nil, fmt.Errorf("no sheets to render")
 	}
 
 	pdf := fpdf.New("P", "mm", "Letter", "")
 	pdf.SetMargins(18, 18, 18)
-	// Every element is positioned manually and the word grid is scaled to fit a
-	// single page, so auto page-break must stay OFF — otherwise the footer (which
-	// sits in the bottom margin) would spill onto a spurious second page.
+	// Every element is positioned manually and each grid is scaled to fit its
+	// page, so auto page-break must stay OFF — otherwise a footer (which sits in
+	// the bottom margin) would spill onto a spurious extra page.
 	pdf.SetAutoPageBreak(false, 0)
-	pdf.AddPage()
 
-	drawHeader(pdf, s)
-	drawInstructions(pdf, s)
-	drawWordGrid(pdf, s)
-	drawFooter(pdf, version)
+	for _, s := range sheets {
+		if s.Total < 1 || s.Threshold < 1 || s.Index < 1 || s.Index > s.Total {
+			return nil, fmt.Errorf("invalid sheet: index %d of %d, threshold %d", s.Index, s.Total, s.Threshold)
+		}
+		pdf.AddPage()
+		drawHeader(pdf, s)
+		drawInstructions(pdf, s)
+		drawWordGrid(pdf, s)
+		drawFooter(pdf, version)
+	}
 
 	var buf bytes.Buffer
 	if err := pdf.Output(&buf); err != nil {
@@ -63,69 +96,86 @@ func Render(s Sheet, version string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// drawHeader renders the title, tagline, and the "#X of M (N required)" banner.
+// drawHeader renders the inverse title bar, the tagline, and the share banner.
 func drawHeader(pdf *fpdf.Fpdf, s Sheet) {
-	pdf.SetTextColor(accent.r, accent.g, accent.b)
-	pdf.SetFont("Helvetica", "B", 26)
-	pdf.CellFormat(0, 12, "splitshot", "", 1, "L", false, 0, "")
+	tr := pdf.UnicodeTranslatorFromDescriptor("")
+
+	// Title bar: a solid dark band with the app name reversed out of it, like a
+	// Turbo Vision window caption.
+	const barH = 13.0
+	y := pdf.GetY()
+	setFill(pdf, cBarBg)
+	setDraw(pdf, cInk)
+	pdf.SetLineWidth(0.4)
+	pdf.Rect(pageLeft, y, pageWidth, barH, "FD")
+
+	setText(pdf, cBarTx)
+	pdf.SetFont("Courier", "B", 22)
+	pdf.SetXY(pageLeft+3, y+1)
+	pdf.CellFormat(pageWidth-6, barH-2, "splitshot", "", 0, "L", false, 0, "")
+	// Right-aligned share marker on the same bar, e.g. "[ 1/5 ]".
+	pdf.SetFont("Courier", "B", 13)
+	pdf.SetXY(pageLeft+3, y+1)
+	pdf.CellFormat(pageWidth-6, barH-2, fmt.Sprintf("[ %d/%d ]", s.Index, s.Total), "", 0, "R", false, 0, "")
+	pdf.SetY(y + barH)
 
 	if s.Tagline != "" {
-		pdf.SetTextColor(110, 110, 110)
-		pdf.SetFont("Helvetica", "I", 10)
-		// Core PDF fonts are cp1252; translate so any non-ASCII punctuation in a
-		// tagline renders correctly rather than as mojibake.
-		tr := pdf.UnicodeTranslatorFromDescriptor("")
-		pdf.CellFormat(0, 6, tr(s.Tagline), "", 1, "L", false, 0, "")
+		setText(pdf, cDim)
+		pdf.SetFont("Courier", "", 9)
+		pdf.Ln(1.5)
+		pdf.CellFormat(0, 5, tr(s.Tagline), "", 1, "L", false, 0, "")
 	}
+	pdf.Ln(2.5)
 
-	pdf.Ln(3)
-	pdf.SetDrawColor(accent.r, accent.g, accent.b)
-	pdf.SetLineWidth(0.6)
-	y := pdf.GetY()
-	pdf.Line(18, y, 197, y)
-	pdf.Ln(5)
+	setText(pdf, cInk)
+	pdf.SetFont("Courier", "B", 17)
+	pdf.CellFormat(0, 9, fmt.Sprintf("RECOVERY SHARE #%d OF %d", s.Index, s.Total), "", 1, "L", false, 0, "")
 
-	pdf.SetTextColor(20, 20, 20)
-	pdf.SetFont("Helvetica", "B", 18)
-	pdf.CellFormat(0, 10, fmt.Sprintf("Recovery Share #%d of %d", s.Index, s.Total), "", 1, "L", false, 0, "")
-
-	pdf.SetFont("Helvetica", "", 12)
-	pdf.SetTextColor(60, 60, 60)
-	pdf.CellFormat(0, 7, fmt.Sprintf("Any %d of the %d shares are required to recover the secret.", s.Threshold, s.Total), "", 1, "L", false, 0, "")
+	pdf.SetFont("Courier", "", 11)
+	setText(pdf, cInk)
+	pdf.CellFormat(0, 6, fmt.Sprintf("Any %d of the %d shares reconstruct the secret.", s.Threshold, s.Total), "", 1, "L", false, 0, "")
 	pdf.SetFont("Courier", "", 10)
+	setText(pdf, cDim)
 	if s.SetID != "" {
-		pdf.CellFormat(0, 7, "Set ID: "+s.SetID+"   (all shares in this set share this ID)", "", 1, "L", false, 0, "")
+		pdf.CellFormat(0, 6, "SET ID: "+s.SetID+"   (shared by every sheet in this set)", "", 1, "L", false, 0, "")
 	} else {
-		pdf.CellFormat(0, 7, "Set ID: ______________   (write the Set ID shown by splitshot)", "", 1, "L", false, 0, "")
+		pdf.CellFormat(0, 6, "SET ID: ______________   (write the Set ID shown by splitshot)", "", 1, "L", false, 0, "")
 	}
 	pdf.Ln(2)
 }
 
-// drawInstructions renders the recovery how-to box.
+// drawInstructions renders the recovery how-to panel: a grey shaded box with a
+// black border and an inverse title tab.
 func drawInstructions(pdf *fpdf.Fpdf, s Sheet) {
-	pdf.SetFillColor(244, 247, 255)
-	pdf.SetDrawColor(200, 215, 245)
-	pdf.SetLineWidth(0.3)
-	x, y := pdf.GetX(), pdf.GetY()
-	const w, h = 179.0, 34.0
-	pdf.RoundedRect(x, y, w, h, 2, "1234", "FD")
+	x, y := pageLeft, pdf.GetY()
+	const w, h, tabH = pageWidth, 34.0, 6.0
 
-	pdf.SetXY(x+4, y+3)
-	pdf.SetTextColor(accent.r, accent.g, accent.b)
-	pdf.SetFont("Helvetica", "B", 11)
-	pdf.CellFormat(0, 6, "How to recover", "", 1, "L", false, 0, "")
+	// Shaded panel + black border.
+	setFill(pdf, cPanel)
+	setDraw(pdf, cInk)
+	pdf.SetLineWidth(0.4)
+	pdf.Rect(x, y, w, h, "FD")
+
+	// Inverse title tab across the top.
+	setFill(pdf, cBarBg)
+	pdf.Rect(x, y, w, tabH, "F")
+	setText(pdf, cBarTx)
+	pdf.SetFont("Courier", "B", 9)
+	pdf.SetXY(x+2, y+0.5)
+	pdf.CellFormat(w-4, tabH-1, "HOW TO RECOVER", "", 0, "L", false, 0, "")
 
 	lines := []string{
-		fmt.Sprintf("1. Gather any %d of the %d share sheets from this set (matching Set ID).", s.Threshold, s.Total),
-		"2. Install splitshot (github.com/jclement/splitshot) on a trusted, offline machine.",
-		"3. Run:  splitshot combine   and type/paste each share's words, one share per line.",
-		"4. The original secret is printed once. A single share alone reveals nothing.",
+		fmt.Sprintf("1. Gather any %d of the %d sheets from this set (matching Set ID).", s.Threshold, s.Total),
+		"2. Install splitshot (github.com/jclement/splitshot) on a trusted, offline box.",
+		"3. Run:  splitshot combine   then type each sheet's words, one sheet per line.",
+		"4. The secret prints once. Fewer than the threshold of sheets reveal nothing.",
 	}
-	pdf.SetTextColor(50, 50, 50)
-	pdf.SetFont("Helvetica", "", 9.5)
+	setText(pdf, cInk)
+	pdf.SetFont("Courier", "", 9)
+	pdf.SetXY(x+3, y+tabH+1.5)
 	for _, ln := range lines {
-		pdf.SetX(x + 4)
-		pdf.CellFormat(w-8, 5.2, ln, "", 1, "L", false, 0, "")
+		pdf.SetX(x + 3)
+		pdf.CellFormat(w-6, 5.0, ln, "", 1, "L", false, 0, "")
 	}
 	pdf.SetY(y + h + 5)
 }
@@ -145,11 +195,11 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 		count = 20 // sensible default if neither words nor a count were supplied
 	}
 
-	pdf.SetTextColor(20, 20, 20)
-	pdf.SetFont("Helvetica", "B", 11)
-	heading := "Write your share words here, in order:"
+	setText(pdf, cInk)
+	pdf.SetFont("Courier", "B", 10)
+	heading := "WRITE YOUR SHARE WORDS HERE, IN ORDER:"
 	if filled {
-		heading = "Your share words (printed below). Store this sheet like the secret itself:"
+		heading = "YOUR SHARE WORDS (PRINTED BELOW). STORE THIS SHEET LIKE THE SECRET ITSELF:"
 	}
 	pdf.CellFormat(0, 7, heading, "", 1, "L", false, 0, "")
 	pdf.Ln(1)
@@ -176,26 +226,29 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 		wordFont = 9
 	}
 
-	const colW, gap, numW = 84.0, 11.0, 10.0
+	const colW, gap, numW = 84.0, 11.0, 11.0
 	for i := 0; i < count; i++ {
 		col := i / perCol
 		row := i % perCol
 		x := startX + float64(col)*(colW+gap)
 		y := startY + float64(row)*rowH
 
+		// Zero-padded number label.
 		pdf.SetXY(x, y)
-		pdf.SetFont("Helvetica", "B", 9)
-		pdf.SetTextColor(accent.r, accent.g, accent.b)
-		pdf.CellFormat(numW-1, boxH, fmt.Sprintf("%2d.", i+1), "", 0, "R", false, 0, "")
+		pdf.SetFont("Courier", "B", 9)
+		setText(pdf, cInk)
+		pdf.CellFormat(numW-1.5, boxH, fmt.Sprintf("%02d", i+1), "", 0, "R", false, 0, "")
 
-		pdf.SetDrawColor(170, 170, 170)
+		// Square shaded box with a black border (a TV-style input field).
+		setFill(pdf, cBoxFil)
+		setDraw(pdf, cInk)
 		pdf.SetLineWidth(0.3)
-		pdf.RoundedRect(x+numW, y, colW-numW, boxH, 1.5, "1234", "D")
+		pdf.Rect(x+numW, y, colW-numW, boxH, "FD")
 
 		if filled && i < len(s.Words) {
 			pdf.SetXY(x+numW+2, y)
-			pdf.SetFont("Courier", "", wordFont)
-			pdf.SetTextColor(20, 20, 20)
+			pdf.SetFont("Courier", "B", wordFont)
+			setText(pdf, cInk)
 			pdf.CellFormat(colW-numW-3, boxH, s.Words[i], "", 0, "L", false, 0, "")
 		}
 	}
@@ -205,13 +258,13 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 // drawFooter stamps the version and a storage reminder at the bottom.
 func drawFooter(pdf *fpdf.Fpdf, version string) {
 	pdf.SetY(-20)
-	pdf.SetDrawColor(220, 220, 220)
+	setDraw(pdf, cRule)
 	pdf.SetLineWidth(0.3)
 	y := pdf.GetY()
-	pdf.Line(18, y, 197, y)
+	pdf.Line(pageLeft, y, pageRight, y)
 	pdf.Ln(2)
-	pdf.SetFont("Helvetica", "I", 8)
-	pdf.SetTextColor(130, 130, 130)
-	pdf.CellFormat(0, 5, "Store each share in a separate location. Possession of too few shares is useless; that is the entire point.", "", 1, "L", false, 0, "")
-	pdf.CellFormat(0, 5, "Generated by splitshot "+version+" - SLIP-0039 Shamir secret sharing.", "", 1, "L", false, 0, "")
+	pdf.SetFont("Courier", "", 8)
+	setText(pdf, cDim)
+	pdf.CellFormat(0, 5, "Store each sheet in a separate place. Too few sheets are useless -- that is the point.", "", 1, "L", false, 0, "")
+	pdf.CellFormat(0, 5, "Generated by splitshot "+version+" -- SLIP-0039 Shamir secret sharing.", "", 1, "L", false, 0, "")
 }

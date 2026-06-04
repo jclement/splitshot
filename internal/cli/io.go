@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/jclement/splitshot/internal/slip039"
@@ -107,4 +108,15 @@ func parseShares(lines []string) ([]slip039.Share, error) {
 // contain key material and should not be world-readable.
 func writeSecureFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o600)
+}
+
+// writePDFFile creates the parent directory if needed and writes the PDF with
+// owner-only permissions.
+func writePDFFile(path string, data []byte) error {
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return fmt.Errorf("creating output directory: %w", err)
+		}
+	}
+	return writeSecureFile(path, data)
 }

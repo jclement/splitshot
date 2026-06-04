@@ -38,8 +38,9 @@ Data flow:
 - `gen`: `secret.Generate` → bytes → `slip039.Split` → shares → render (+PDF).
 - `split`: read stdin/file → `slip039.Split` → shares → render (+PDF).
 - `combine`: read stdin → parse/dedupe shares → `slip039.Combine` → secret.
-- `pdf`: from `-n`/`-m`/`-l` flags → blank `pdf.Render` per sheet (no secret).
-  With `-p`: read secret from stdin → `slip039.Split` → `pdf.Render` with words.
+- `pdf`: from `-n`/`-m`/`-l` flags → single multi-page blank `pdf.RenderAll`
+  (no secret). With `-p`: read secret from stdin → `slip039.Split` →
+  `pdf.RenderAll` with words.
 
 ## Project structure
 
@@ -57,7 +58,7 @@ internal/
     slip039.go               — public Split / Combine + raw Shamir split/recover
     vectors_test.go          — official SLIP-0039 vectors
   secret/generate.go         — crypto/rand secret generation, charsets, rejection sampling
-  pdf/pdf.go                 — blank per-share backup sheet (go-pdf/fpdf, core fonts)
+  pdf/pdf.go                 — multi-page backup PDF, retro/monospace (go-pdf/fpdf)
   cli/                       — Cobra commands, Lipgloss styles, TTY-aware I/O
   taglines/taglines.go       — ~200 taglines
 testdata/slip39-vectors.json — official vectors, run in full by the test suite
@@ -92,15 +93,18 @@ testdata/slip39-vectors.json — official vectors, run in full by the test suite
    tests so the error paths are reachable). Character selection uses rejection
    sampling to eliminate modulo bias.
 
-6. **The PDF is a blank template by default.** In the default path the renderer
-   is given only a word *count*, never the words — so a backup sheet cannot leak
-   the secret. It prints the share number, the threshold, a Set ID (the SLIP-0039
-   identifier, so sheets of one set are matchable), recovery instructions, and
-   numbered empty boxes to handwrite into. The lone exception is the explicit
-   `pdf -p` mode, which reads a secret from stdin, splits it, and *prints* the
-   words into the boxes — opt-in only, for users who trust their printer. Core
-   PDF fonts (Helvetica/Courier) keep the binary free of embedded TTFs; text is
-   run through fpdf's cp1252 translator so non-ASCII punctuation renders cleanly.
+6. **One multi-page PDF, blank by default.** The whole set is rendered into a
+   single PDF, one share per page (`RenderAll`), so there's one file to print and
+   handle. In the default path the renderer is given only a word *count*, never
+   the words — so a sheet cannot leak the secret. Each page shows the share
+   number, the threshold, a Set ID (the SLIP-0039 identifier, so pages of one set
+   are matchable), recovery instructions, and numbered empty boxes to handwrite
+   into. The lone exception is the explicit `pdf -p` mode, which reads a secret
+   from stdin, splits it, and *prints* the words into the boxes — opt-in only,
+   for users who trust their printer. The visual style is deliberately retro
+   (monospace Courier, black borders, grey shaded panels, an inverse title bar).
+   Core PDF fonts keep the binary free of embedded TTFs; text runs through fpdf's
+   cp1252 translator so non-ASCII punctuation renders cleanly.
 
 7. **TTY-aware output.** Lipgloss renderers are bound to the actual output
    writer, so a piped run emits plain, color-free, label-free shares on stdout
@@ -133,8 +137,8 @@ testdata/slip39-vectors.json — official vectors, run in full by the test suite
   reader. ~97% statement coverage (the remainder is unreachable defensive guards).
 - **secret:** 100% — length/charset correctness, dedupe, rejection sampling, and
   RNG-failure branches via an erroring reader.
-- **pdf:** ~99% — output is a valid PDF (`%PDF`…`%%EOF`), correct per-share count,
-  invalid sheets rejected.
+- **pdf:** ~98% — output is a valid PDF (`%PDF`…`%%EOF`), single-page per sheet,
+  correct multi-page count, invalid sheets rejected.
 - **cli:** ~95% — gen→combine and split→combine round-trips, charset selection,
   comment/separator skipping, passphrase behavior, both piped and interactive
   rendering (via a test-only TTY override), and the user-facing error paths.

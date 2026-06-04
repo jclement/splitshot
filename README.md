@@ -44,8 +44,8 @@ go install github.com/jclement/splitshot/cmd/splitshot@latest
 ## Quick start
 
 ```bash
-# Generate a strong secret (32-char ASCII, ~210 bits), split 2-of-3, write PDFs.
-splitshot gen -n 2 -m 3 --pdf ./backups
+# Generate a strong secret (32-char ASCII, ~210 bits), split 2-of-3, write a PDF.
+splitshot gen -n 2 -m 3 --pdf backup.pdf
 
 # Recover it: paste any 2 of the 3 shares, one per line, then Ctrl-D.
 splitshot combine
@@ -68,7 +68,7 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 | `splitshot gen` | Generate a random secret and split it into N-of-M shares |
 | `splitshot split` | Split an existing secret (stdin or `--secret-file`) |
 | `splitshot combine` | Reconstruct a secret from share mnemonics on stdin |
-| `splitshot pdf` | Generate blank backup-sheet templates (`-n`/`-m`/`-l`); `-p` reads a secret from stdin and prints filled sheets |
+| `splitshot pdf` | Generate a single multi-page blank backup PDF (`-n`/`-m`/`-l`); `-p` reads a secret from stdin and prints the words |
 | `splitshot version` | Print version and build info |
 
 ## Key flags
@@ -80,11 +80,11 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 | `-l, --length` | gen | Secret length (must be even and ≥16; 16→20-word shares, 32→33-word) | `32` |
 | `--charset` | gen | `alphanumeric`, `alpha`, `digits`, `hex`, `safe`, `ascii`, or a literal set | `ascii` |
 | `--passphrase` | gen, split, combine | Optional passphrase (printable ASCII) protecting the secret | `""` |
-| `--pdf` | gen, split | Directory to write blank PDF backup sheets into | — |
+| `--pdf` | gen, split | Write a single multi-page blank backup PDF to this path | — |
 | `--show-secret` | gen, split | Echo the secret once (gen defaults on, split off) | — |
-| `-l, --length` | pdf | Secret length the blank sheets are sized for (ignored with `-p`) | `32` |
-| `-p, --fill` | pdf | Read a secret from stdin, split it, and **print** the words onto the sheets | `false` |
-| `-o, --out` | pdf | Output directory for sheets | `.` |
+| `-l, --length` | pdf | Secret length the blank pages are sized for (ignored with `-p`) | `32` |
+| `-p, --fill` | pdf | Read a secret from stdin, split it, and **print** the words onto the pages | `false` |
+| `-o, --out` | pdf | Output PDF path | `splitshot-backup.pdf` |
 
 ## Security notes
 

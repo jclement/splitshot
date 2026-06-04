@@ -9,8 +9,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -22,7 +20,7 @@ import (
 
 // shareOutput holds the output choices shared by gen and split.
 type shareOutput struct {
-	pdfDir string // if non-empty, write per-share PDFs here
+	pdfPath string // if non-empty, write a single multi-page backup PDF here
 }
 
 // emitSecret echoes the secret with a loud warning. Interactive sessions get it
@@ -98,20 +96,19 @@ func emitShares(cmd *cobra.Command, info BuildInfo, shares []slip039.Share, thre
 		}
 	}
 
-	if opts.pdfDir != "" {
+	if opts.pdfPath != "" {
 		return writePDFs(cmd, info, shares, threshold, total, opts)
 	}
 	return nil
 }
 
-// writePDFs renders one backup sheet per share into opts.pdfDir (0600 files).
+// writePDFs renders all shares into a single multi-page backup PDF at
+// opts.pdfPath (0600). The boxes are blank (handwriting template).
 func writePDFs(cmd *cobra.Command, info BuildInfo, shares []slip039.Share, threshold, total int, opts shareOutput) error {
-	if err := os.MkdirAll(opts.pdfDir, 0o700); err != nil {
-		return fmt.Errorf("creating PDF directory: %w", err)
-	}
 	setID := fmt.Sprintf("%04X", shares[0].Identifier)
+	sheets := make([]pdf.Sheet, len(shares))
 	for i, s := range shares {
-		sheet := pdf.Sheet{
+		sheets[i] = pdf.Sheet{
 			Index:     i + 1,
 			Total:     total,
 			Threshold: threshold,
@@ -119,16 +116,15 @@ func writePDFs(cmd *cobra.Command, info BuildInfo, shares []slip039.Share, thres
 			WordCount: len(s.Words()),
 			Tagline:   taglines.Pick(shares[0].Identifier + i),
 		}
-		data, err := pdf.Render(sheet, info.Version)
-		if err != nil {
-			return fmt.Errorf("rendering share %d PDF: %w", i+1, err)
-		}
-		path := filepath.Join(opts.pdfDir, fmt.Sprintf("splitshot-share-%d-of-%d.pdf", i+1, total))
-		if err := writeSecureFile(path, data); err != nil {
-			return fmt.Errorf("writing %s: %w", path, err)
-		}
+	}
+	data, err := pdf.RenderAll(sheets, info.Version)
+	if err != nil {
+		return fmt.Errorf("rendering backup PDF: %w", err)
+	}
+	if err := writePDFFile(opts.pdfPath, data); err != nil {
+		return err
 	}
 	// Notice to stderr so it never pollutes piped share output.
-	fmt.Fprintf(cmd.ErrOrStderr(), "Wrote %d backup sheet(s) to %s/ (Set ID %s)\n", len(shares), opts.pdfDir, setID)
+	fmt.Fprintf(cmd.ErrOrStderr(), "Wrote %d-page backup PDF to %s (Set ID %s)\n", len(sheets), opts.pdfPath, setID)
 	return nil
 }

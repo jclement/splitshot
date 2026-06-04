@@ -19,7 +19,7 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 		threshold  int
 		total      int
 		passphrase string
-		pdfDir     string
+		pdfPath    string
 		secretFile string
 		showSecret bool
 	)
@@ -44,7 +44,7 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 			if showSecret {
 				emitSecret(cmd, string(secretBytes))
 			}
-			return emitShares(cmd, info, shares, threshold, total, shareOutput{pdfDir: pdfDir})
+			return emitShares(cmd, info, shares, threshold, total, shareOutput{pdfPath: pdfPath})
 		},
 	}
 
@@ -52,7 +52,7 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 	f.IntVarP(&threshold, "threshold", "n", 3, "shares required to recover (N)")
 	f.IntVarP(&total, "shares", "m", 5, "total shares to produce (M)")
 	f.StringVar(&passphrase, "passphrase", "", "optional passphrase (printable ASCII) protecting the secret")
-	f.StringVar(&pdfDir, "pdf", "", "directory to write blank per-share PDF backup sheets into")
+	f.StringVar(&pdfPath, "pdf", "", "write a single multi-page backup PDF to this path (e.g. backup.pdf)")
 	f.StringVar(&secretFile, "secret-file", "", "read the secret from this file instead of stdin")
 	f.BoolVar(&showSecret, "show-secret", false, "echo the secret back after reading it")
 
