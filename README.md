@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="splitshot — Shamir secret sharing for the insanely paranoid" width="540">
+</p>
+
 # splitshot
 
 **Cut your most precious secret into pieces, scatter the pieces across people and places who don't know about each other, and sleep like someone who has read a threat model.**
