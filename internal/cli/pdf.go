@@ -62,15 +62,13 @@ func newPDFCmd(info BuildInfo) *cobra.Command {
 	}
 
 	f := cmd.Flags()
-	f.IntVarP(&threshold, "threshold", "n", 0, "shares required to recover (N)")
-	f.IntVarP(&total, "shares", "m", 0, "total shares (M) — one sheet each")
+	f.IntVarP(&threshold, "threshold", "n", 3, "shares required to recover (N)")
+	f.IntVarP(&total, "shares", "m", 5, "total shares (M) — one sheet each")
 	f.IntVarP(&length, "length", "l", 32, "secret length the blank sheets are sized for (ignored with -p)")
 	f.BoolVarP(&fill, "fill", "p", false, "read a secret from stdin, split it, and PRINT the words onto the sheets")
 	f.StringVar(&passphrase, "passphrase", "", "passphrase protecting the secret (with -p)")
 	f.StringVarP(&outDir, "out", "o", ".", "directory to write the PDF backup sheets into")
 
-	must(cmd.MarkFlagRequired("threshold"))
-	must(cmd.MarkFlagRequired("shares"))
 	return cmd
 }
 

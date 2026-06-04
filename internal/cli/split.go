@@ -49,15 +49,13 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 	}
 
 	f := cmd.Flags()
-	f.IntVarP(&threshold, "threshold", "n", 0, "shares required to recover (N)")
-	f.IntVarP(&total, "shares", "m", 0, "total shares to produce (M)")
+	f.IntVarP(&threshold, "threshold", "n", 3, "shares required to recover (N)")
+	f.IntVarP(&total, "shares", "m", 5, "total shares to produce (M)")
 	f.StringVar(&passphrase, "passphrase", "", "optional passphrase (printable ASCII) protecting the secret")
 	f.StringVar(&pdfDir, "pdf", "", "directory to write blank per-share PDF backup sheets into")
 	f.StringVar(&secretFile, "secret-file", "", "read the secret from this file instead of stdin")
 	f.BoolVar(&showSecret, "show-secret", false, "echo the secret back after reading it")
 
-	must(cmd.MarkFlagRequired("threshold"))
-	must(cmd.MarkFlagRequired("shares"))
 	return cmd
 }
 

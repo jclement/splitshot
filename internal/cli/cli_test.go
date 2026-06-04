@@ -75,6 +75,25 @@ func TestGenCombineRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGenDefaultThreshold(t *testing.T) {
+	// No -n/-m: defaults to 3-of-5.
+	out, _, err := run(t, "", "gen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shares := strings.Split(strings.TrimSpace(out), "\n")
+	if len(shares) != 5 {
+		t.Fatalf("expected 5 default shares, got %d", len(shares))
+	}
+	// Any 3 recover; 2 must not.
+	if _, _, err := run(t, strings.Join(shares[:3], "\n"), "combine"); err != nil {
+		t.Fatalf("combine 3-of-5: %v", err)
+	}
+	if _, _, err := run(t, strings.Join(shares[:2], "\n"), "combine"); err == nil {
+		t.Fatal("2 shares should be insufficient for default 3-of-5")
+	}
+}
+
 func TestGenCharset(t *testing.T) {
 	_, errb, err := run(t, "", "gen", "-l", "16", "-n", "2", "-m", "2", "--charset", "digits")
 	if err != nil {
@@ -106,8 +125,6 @@ func TestGenErrors(t *testing.T) {
 		{"gen", "-l", "15", "-n", "2", "-m", "3"}, // odd length
 		{"gen", "-l", "10", "-n", "2", "-m", "3"}, // too short
 		{"gen", "-l", "30", "-n", "5", "-m", "3"}, // threshold > total
-		{"gen", "-m", "3"},                        // missing threshold
-		{"gen", "-n", "2"},                        // missing shares
 		{"gen", "-n", "2", "-m", "3", "--charset", "x"},
 	}
 	for _, args := range cases {
@@ -274,8 +291,6 @@ func TestPDFCommandErrors(t *testing.T) {
 		stdin string
 		args  []string
 	}{
-		{"", []string{"pdf", "-m", "3"}},                           // missing threshold
-		{"", []string{"pdf", "-n", "2"}},                           // missing shares
 		{"", []string{"pdf", "-n", "5", "-m", "3"}},                // threshold > total
 		{"", []string{"pdf", "-n", "1", "-m", "3"}},                // threshold < 2
 		{"", []string{"pdf", "-n", "2", "-m", "3", "-l", "15"}},    // odd length

@@ -75,14 +75,13 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 
 | Flag | Commands | Description | Default |
 |------|----------|-------------|---------|
-| `-n, --threshold` | gen, split | Shares required to recover (N) | — (required) |
-| `-m, --shares` | gen, split | Total shares to produce (M) | — (required) |
+| `-n, --threshold` | gen, split, pdf | Shares required to recover (N) | `3` |
+| `-m, --shares` | gen, split, pdf | Total shares to produce (M) | `5` |
 | `-l, --length` | gen | Secret length (must be even and ≥16; 16→20-word shares, 32→33-word) | `32` |
 | `--charset` | gen | `alphanumeric`, `alpha`, `digits`, `hex`, `safe`, `ascii`, or a literal set | `ascii` |
 | `--passphrase` | gen, split, combine | Optional passphrase (printable ASCII) protecting the secret | `""` |
 | `--pdf` | gen, split | Directory to write blank PDF backup sheets into | — |
 | `--show-secret` | gen, split | Echo the secret once (gen defaults on, split off) | — |
-| `-n, -m` | pdf | Threshold / total to label the sheets | — (required) |
 | `-l, --length` | pdf | Secret length the blank sheets are sized for (ignored with `-p`) | `32` |
 | `-p, --fill` | pdf | Read a secret from stdin, split it, and **print** the words onto the sheets | `false` |
 | `-o, --out` | pdf | Output directory for sheets | `.` |

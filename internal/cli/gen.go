@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/jclement/splitshot/internal/secret"
@@ -49,22 +48,12 @@ func newGenCmd(info BuildInfo) *cobra.Command {
 
 	f := cmd.Flags()
 	f.IntVarP(&length, "length", "l", 32, "length of the generated secret (must be even and ≥16; 16→20 words, 32→33 words)")
-	f.IntVarP(&threshold, "threshold", "n", 0, "shares required to recover (N)")
-	f.IntVarP(&total, "shares", "m", 0, "total shares to produce (M)")
+	f.IntVarP(&threshold, "threshold", "n", 3, "shares required to recover (N)")
+	f.IntVarP(&total, "shares", "m", 5, "total shares to produce (M)")
 	f.StringVar(&charset, "charset", "ascii", "character set: "+strings.Join(secret.PresetNames(), ", ")+", or a literal set")
 	f.StringVar(&passphrase, "passphrase", "", "optional passphrase (printable ASCII) protecting the secret")
 	f.StringVar(&pdfDir, "pdf", "", "directory to write blank per-share PDF backup sheets into")
 	f.BoolVar(&showSecret, "show-secret", true, "echo the generated secret (disable to only emit shares)")
 
-	must(cmd.MarkFlagRequired("threshold"))
-	must(cmd.MarkFlagRequired("shares"))
 	return cmd
-}
-
-// must panics on an error that can only occur from a programming mistake (e.g.
-// marking a non-existent flag required). It never fires at runtime.
-func must(err error) {
-	if err != nil {
-		panic(fmt.Sprintf("cli setup: %v", err))
-	}
 }
