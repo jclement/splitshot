@@ -6,13 +6,15 @@
 package slip039
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"io"
 )
 
 // defaultIterationExponent matches the reference default. 10000<<1 = 20000
-// PBKDF2 iterations is plenty for a passphrase that is a second factor, not the
-// sole secret, and keeps the CLI snappy.
+// PBKDF2 iterations TOTAL (≈5000 per round over the 4 Feistel rounds) — plenty
+// for a passphrase that is a second factor, not the sole secret, and keeps the
+// CLI snappy.
 const defaultIterationExponent = 1
 
 // WordsPerShare reports how many mnemonic words each share will have when a
@@ -85,10 +87,11 @@ func Split(secret []byte, threshold, total int, passphrase string, rand io.Reade
 // the minimum; extras of a matching set are tolerated). The passphrase must be
 // the one used at Split time — a wrong passphrase yields a different secret,
 // not an error, by SLIP-0039 design.
+//
+// Recovery does not validate the passphrase charset: the reference
+// combine_mnemonics passes the passphrase straight to the cipher, so we do too
+// (maximally permissive recovery, including shares from other conforming tools).
 func Combine(shares []Share, passphrase string) ([]byte, error) {
-	if err := validatePassphrase(passphrase); err != nil {
-		return nil, err
-	}
 	if len(shares) == 0 {
 		return nil, fmt.Errorf("no shares provided")
 	}
@@ -250,7 +253,9 @@ func recoverSecret(threshold int, shares []rawShare) ([]byte, error) {
 	}
 	digest := digestShare[:digestLengthBytes]
 	randomPart := digestShare[digestLengthBytes:]
-	if !equalBytes(digest, createDigest(randomPart, sharedSecret)) {
+	// Constant-time compare as defense-in-depth (the reference compares plainly;
+	// there is no remote timing oracle here, but intent-signaling is cheap).
+	if subtle.ConstantTimeCompare(digest, createDigest(randomPart, sharedSecret)) != 1 {
 		return nil, fmt.Errorf("invalid digest of the shared secret (wrong or corrupt shares)")
 	}
 	return sharedSecret, nil

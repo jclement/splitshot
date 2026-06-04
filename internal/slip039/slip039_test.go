@@ -151,8 +151,11 @@ func TestSplitValidation(t *testing.T) {
 		{"threshold below 2", ok, 1, 3, ""},
 		{"threshold above total", ok, 4, 3, ""},
 		{"too many shares", ok, 2, 17, ""},
-		{"secret too short", bytes.Repeat([]byte{1}, 14), 2, 3, ""},
-		{"secret odd length", bytes.Repeat([]byte{1}, 15), 2, 3, ""},
+		{"secret too short (even)", bytes.Repeat([]byte{1}, 14), 2, 3, ""},
+		{"secret too short (odd)", bytes.Repeat([]byte{1}, 15), 2, 3, ""},
+		// 17 bytes is ≥16 yet odd, so it exercises the even-length guard
+		// specifically (15 bytes trips the too-short guard first).
+		{"secret odd length but ≥16", bytes.Repeat([]byte{1}, 17), 2, 3, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -185,9 +188,6 @@ func TestCombineValidation(t *testing.T) {
 
 	if _, err := Combine(nil, ""); err == nil {
 		t.Fatal("expected error for empty share set")
-	}
-	if _, err := Combine(shares, "café"); err == nil {
-		t.Fatal("expected error for bad passphrase")
 	}
 	if _, err := Combine(shares[:1], ""); err == nil {
 		t.Fatal("expected error for insufficient shares")

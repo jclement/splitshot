@@ -101,8 +101,12 @@ func Generate(length int, charset string, rand io.Reader) (string, error) {
 }
 
 // uniformIndex returns a uniformly random integer in [0, n) using rejection
-// sampling to eliminate modulo bias. n must be in [1, 256].
+// sampling to eliminate modulo bias. n must be in [1, 256]; outside that range
+// it errors rather than (for n>256) looping forever draining the RNG.
 func uniformIndex(rand io.Reader, n int) (int, error) {
+	if n < 1 || n > 256 {
+		return 0, fmt.Errorf("uniformIndex: n must be in [1,256], got %d", n)
+	}
 	// Largest multiple of n that fits in a byte; values at or above it are
 	// rejected so every index is equally likely.
 	limit := 256 - (256 % n)

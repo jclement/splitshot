@@ -23,6 +23,7 @@ func newPDFCmd(info BuildInfo) *cobra.Command {
 		outPath    string
 		fill       bool
 		passphrase string
+		askPass    bool
 	)
 
 	cmd := &cobra.Command{
@@ -42,11 +43,15 @@ func newPDFCmd(info BuildInfo) *cobra.Command {
 				return fmt.Errorf("need 2 ≤ -n ≤ -m ≤ %d (got n=%d, m=%d)", maxShares, threshold, total)
 			}
 			if fill {
+				pass, err := resolvePassphrase(passphrase, askPass, true)
+				if err != nil {
+					return err
+				}
 				secretBytes, err := readSecret(cmd, "")
 				if err != nil {
 					return err
 				}
-				shares, err := slip039.Split(secretBytes, threshold, total, passphrase, randSource)
+				shares, err := slip039.Split(secretBytes, threshold, total, pass, randSource)
 				if err != nil {
 					return err
 				}
@@ -65,6 +70,7 @@ func newPDFCmd(info BuildInfo) *cobra.Command {
 	f.IntVarP(&length, "length", "l", 32, "secret length the blank pages are sized for (ignored with -p)")
 	f.BoolVarP(&fill, "fill", "p", false, "read a secret from stdin, split it, and PRINT the words onto the pages")
 	f.StringVar(&passphrase, "passphrase", "", "passphrase protecting the secret (with -p)")
+	f.BoolVar(&askPass, "ask-passphrase", false, "prompt for the passphrase on the terminal (with -p; avoids argv/shell history)")
 	f.StringVarP(&outPath, "out", "o", "splitshot-backup.pdf", "path of the backup PDF to write")
 
 	return cmd

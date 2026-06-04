@@ -110,6 +110,51 @@ func writeSecureFile(path string, data []byte) error {
 	return os.WriteFile(path, data, 0o600)
 }
 
+// resolvePassphrase combines the --passphrase and --ask-passphrase inputs. At
+// most one may be set. --ask-passphrase prompts securely on the controlling
+// terminal so the passphrase never lands in argv or shell history; confirm
+// requires it to be typed twice (for creation paths: gen/split/pdf -p).
+func resolvePassphrase(flagValue string, ask, confirm bool) (string, error) {
+	if !ask {
+		return flagValue, nil
+	}
+	if flagValue != "" {
+		return "", fmt.Errorf("use only one of --passphrase and --ask-passphrase")
+	}
+	return promptPassphrase(confirm)
+}
+
+// promptPassphrase reads a passphrase from the controlling terminal (/dev/tty),
+// never from argv or the data stdin. Returns an error if there is no terminal
+// (in which case the caller should use --passphrase).
+func promptPassphrase(confirm bool) (string, error) {
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return "", fmt.Errorf("no terminal available for passphrase entry; use --passphrase: %w", err)
+	}
+	defer tty.Close()
+	fd := int(tty.Fd())
+
+	fmt.Fprint(tty, "Passphrase: ")
+	first, err := term.ReadPassword(fd)
+	fmt.Fprintln(tty)
+	if err != nil {
+		return "", fmt.Errorf("reading passphrase: %w", err)
+	}
+	if confirm {
+		fmt.Fprint(tty, "Confirm passphrase: ")
+		second, err := term.ReadPassword(fd)
+		fmt.Fprintln(tty)
+		if err != nil {
+			return "", fmt.Errorf("reading passphrase: %w", err)
+		}
+		if string(first) != string(second) {
+			return "", fmt.Errorf("passphrases did not match")
+		}
+	}
+	return string(first), nil
+}
+
 // writePDFFile creates the parent directory if needed and writes the PDF with
 // owner-only permissions.
 func writePDFFile(path string, data []byte) error {

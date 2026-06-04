@@ -267,6 +267,23 @@ func TestPDFDirCreationFails(t *testing.T) {
 	}
 }
 
+func TestAskPassphraseConflictsWithFlag(t *testing.T) {
+	// --passphrase and --ask-passphrase are mutually exclusive; this errors
+	// before any terminal access, so it's testable without a TTY.
+	cmds := [][]string{
+		{"gen", "-n", "2", "-m", "2", "--passphrase", "x", "--ask-passphrase"},
+		{"split", "-n", "2", "-m", "2", "--passphrase", "x", "--ask-passphrase"},
+		{"combine", "--passphrase", "x", "--ask-passphrase"},
+		{"pdf", "-p", "-n", "2", "-m", "2", "--passphrase", "x", "--ask-passphrase"},
+	}
+	for _, args := range cmds {
+		stdin := "sixteen-byte-key" // satisfies split/pdf secret read if reached
+		if _, _, err := run(t, stdin, args...); err == nil {
+			t.Fatalf("expected conflict error for %v", args)
+		}
+	}
+}
+
 func TestCombineWrongPassphraseDiffers(t *testing.T) {
 	secret := "sixteen-byte-key"
 	out, _, _ := run(t, secret, "split", "-n", "2", "-m", "2", "--passphrase", "right")

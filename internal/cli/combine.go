@@ -11,7 +11,10 @@ import (
 
 // newCombineCmd builds the `combine` subcommand.
 func newCombineCmd() *cobra.Command {
-	var passphrase string
+	var (
+		passphrase string
+		askPass    bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "combine",
@@ -22,6 +25,10 @@ func newCombineCmd() *cobra.Command {
 			"stdout.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			pass, err := resolvePassphrase(passphrase, askPass, false)
+			if err != nil {
+				return err
+			}
 			lines, err := readShareLines(cmd.InOrStdin())
 			if err != nil {
 				return err
@@ -30,7 +37,7 @@ func newCombineCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			secret, err := slip039.Combine(shares, passphrase)
+			secret, err := slip039.Combine(shares, pass)
 			if err != nil {
 				return err
 			}
@@ -40,6 +47,7 @@ func newCombineCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&passphrase, "passphrase", "", "passphrase used when the secret was split")
+	cmd.Flags().BoolVar(&askPass, "ask-passphrase", false, "prompt for the passphrase on the terminal (avoids argv/shell history)")
 	return cmd
 }
 

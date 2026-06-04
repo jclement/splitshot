@@ -276,6 +276,7 @@ passphrase back. The third is left as an exercise for Eve.)
 | `-l, --length` | gen, pdf | Secret length (even, ≥16; 16→20-word shares, 32→33-word) | `32` |
 | `--charset` | gen | `alphanumeric`, `alpha`, `digits`, `hex`, `safe`, `ascii`, or a literal set | `ascii` |
 | `--passphrase` | gen, split, combine, pdf | Optional passphrase / second factor | `""` |
+| `--ask-passphrase` | gen, split, combine, pdf | Prompt for the passphrase on the terminal (keeps it out of argv & shell history) | `false` |
 | `--pdf` | gen, split | Write a single multi-page backup PDF to this path | — |
 | `-p, --fill` | pdf | Read a secret from stdin and **print** the words onto the pages | `false` |
 | `-o, --out` | pdf | Output PDF path | `splitshot-backup.pdf` |
@@ -292,7 +293,9 @@ passphrase back. The third is left as an exercise for Eve.)
 - **The passphrase is a real second factor.** No passphrase is fine for most
   people. A passphrase means the words alone aren't enough — and a *decoy*
   passphrase means a coerced unlock reveals a decoy. There's no way to tell from
-  the shares which passphrase is "right."
+  the shares which passphrase is "right." Use **`--ask-passphrase`** to type it
+  at a terminal prompt rather than `--passphrase` on the command line — the
+  latter lands in your shell history and process list.
 - **PDFs are blank by default and written `0600`.** The words only hit paper if
   you explicitly ask (`pdf -p`), and even then it's your printer's problem now.
 - **Recover on a trusted, offline machine.** ~210 bits of entropy is irrelevant
@@ -317,7 +320,10 @@ passphrase back. The third is left as an exercise for Eve.)
 
 The correctness-critical bits (SLIP-0039: GF(256), RS1024, Feistel/PBKDF2) are
 implemented locally and verified against the **official SLIP-0039 test vectors**.
-See [DESIGN.md](DESIGN.md) for the architecture and the gory crypto details.
+See [DESIGN.md](DESIGN.md) for the architecture and the gory crypto details, and
+[AUDIT.md](AUDIT.md) for a multi-agent adversarial security & cryptography review
+(verdict: zero critical/high findings; RNG, Shamir, and SLIP-0039 confirmed
+correct and vector-conformant).
 
 ---
 

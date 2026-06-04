@@ -19,6 +19,7 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 		threshold  int
 		total      int
 		passphrase string
+		askPass    bool
 		pdfPath    string
 		secretFile string
 		showSecret bool
@@ -33,11 +34,15 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 			"number of bytes (a SLIP-0039 requirement).",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			pass, err := resolvePassphrase(passphrase, askPass, true)
+			if err != nil {
+				return err
+			}
 			secretBytes, err := readSecret(cmd, secretFile)
 			if err != nil {
 				return err
 			}
-			shares, err := slip039.Split(secretBytes, threshold, total, passphrase, randSource)
+			shares, err := slip039.Split(secretBytes, threshold, total, pass, randSource)
 			if err != nil {
 				return err
 			}
@@ -52,6 +57,7 @@ func newSplitCmd(info BuildInfo) *cobra.Command {
 	f.IntVarP(&threshold, "threshold", "n", 3, "shares required to recover (N)")
 	f.IntVarP(&total, "shares", "m", 5, "total shares to produce (M)")
 	f.StringVar(&passphrase, "passphrase", "", "optional passphrase (printable ASCII) protecting the secret")
+	f.BoolVar(&askPass, "ask-passphrase", false, "prompt for the passphrase on the terminal (avoids argv/shell history)")
 	f.StringVar(&pdfPath, "pdf", "", "write a single multi-page backup PDF to this path (e.g. backup.pdf)")
 	f.StringVar(&secretFile, "secret-file", "", "read the secret from this file instead of stdin")
 	f.BoolVar(&showSecret, "show-secret", false, "echo the secret back after reading it")
