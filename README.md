@@ -223,6 +223,38 @@ that does not phone home. Because it was.
 
 ---
 
+## A real, working example (these shares actually recover)
+
+Bob's vault passphrase is `hunter2-keepass!` (he's been told, repeatedly, to
+stop reusing it). He splits it **2-of-3**:
+
+```console
+$ printf '%s' 'hunter2-keepass!' | splitshot split -n 2 -m 3
+living crush academic acid airline withdraw surprise merit eyebrow advance rumor silent formal voter coastal market beam filter usher agree
+living crush academic agency ancestor funding chew gross tadpole premium burning gravity rich hobo morning class wireless lunch river priest
+living crush academic always burning peanut equation slap explain ending idea diet bishop steady cradle include easy smear solution glen
+```
+
+Three shares. Note they all begin `living crush academic …` — that shared prefix
+is the Set ID, so Bob can tell at a glance they belong together. He keeps share 1,
+mails share 2 to Alice, buries share 3 in the yard.
+
+A year later he digs up #3 and grabs his own #1 — **any two** will do — and pastes
+them into `combine` (one per line, then `Ctrl-D`):
+
+```console
+$ splitshot combine
+living crush academic acid airline withdraw surprise merit eyebrow advance rumor silent formal voter coastal market beam filter usher agree
+living crush academic always burning peanut equation slap explain ending idea diet bishop steady cradle include easy smear solution glen
+^D
+hunter2-keepass!
+```
+
+`hunter2-keepass!` — exactly what went in. Try it with only **one** share and
+`combine` refuses: `insufficient shares: need 2, have 1`. (Those words above are
+a genuine `splitshot` split; paste any two of the three and you'll get the
+passphrase back. The third is left as an exercise for Eve.)
+
 ## Command & flag reference
 
 | Command | What it does |
