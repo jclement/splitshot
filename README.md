@@ -43,8 +43,8 @@ go install github.com/jclement/splitshot/cmd/splitshot@latest
 ## Quick start
 
 ```bash
-# Generate a 30-char secret, split 2-of-3, and write blank PDF backup sheets.
-splitshot gen -l 30 -n 2 -m 3 --pdf ./backups
+# Generate a strong secret (32-char ASCII, ~210 bits), split 2-of-3, write PDFs.
+splitshot gen -n 2 -m 3 --pdf ./backups
 
 # Recover it: paste any 2 of the 3 shares, one per line, then Ctrl-D.
 splitshot combine
@@ -76,8 +76,8 @@ straight into `combine`), while the secret, banners, and PDF notices go to
 |------|----------|-------------|---------|
 | `-n, --threshold` | gen, split | Shares required to recover (N) | — (required) |
 | `-m, --shares` | gen, split | Total shares to produce (M) | — (required) |
-| `-l, --length` | gen | Secret length (must be even and ≥16) | `30` |
-| `--charset` | gen | `alphanumeric`, `alpha`, `digits`, `hex`, `safe`, `ascii`, or a literal set | `alphanumeric` |
+| `-l, --length` | gen | Secret length (must be even and ≥16; 16→20-word shares, 32→33-word) | `32` |
+| `--charset` | gen | `alphanumeric`, `alpha`, `digits`, `hex`, `safe`, `ascii`, or a literal set | `ascii` |
 | `--passphrase` | gen, split, combine | Optional passphrase (printable ASCII) protecting the secret | `""` |
 | `--pdf` | gen, split | Directory to write blank PDF backup sheets into | — |
 | `--show-secret` | gen, split | Echo the secret once (gen defaults on, split off) | — |

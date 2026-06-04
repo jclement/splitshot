@@ -117,7 +117,8 @@ testdata/slip39-vectors.json — official vectors, run in full by the test suite
 - **Checksum:** RS1024 Reed-Solomon over the mnemonic words, with the
   `"shamir_extendable"` customization string (we generate extendable shares).
 - **Master-secret constraints:** at least 128 bits and an even number of bytes,
-  per the spec. `gen` defaults to 30 bytes; odd/short inputs are rejected.
+  per the spec. `gen` defaults to a paranoid 32-byte ASCII secret (~210 bits →
+  clean 33-word shares); odd/short inputs are rejected.
 
 ## Testing strategy
 
