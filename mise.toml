@@ -22,13 +22,16 @@ CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=dev" -o bin/splitshot ./c
 echo "Built bin/splitshot"
 """
 
+# The race detector requires cgo, so these tasks override the global
+# CGO_ENABLED=0 (which exists to keep release *builds* static). Test binaries
+# using cgo don't affect the shipped artifact, which is built CGO_ENABLED=0.
 [tasks.test]
 description = "Run all tests with the race detector and coverage"
-run = "go test -race -cover ./..."
+run = "CGO_ENABLED=1 go test -race -cover ./..."
 
 [tasks."test:unit"]
 description = "Unit tests only (alias of test — there is no other kind here)"
-run = "go test -race -cover ./..."
+run = "CGO_ENABLED=1 go test -race -cover ./..."
 
 [tasks.cover]
 description = "Generate an HTML coverage report into coverage.html"
