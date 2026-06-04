@@ -45,7 +45,10 @@ func Render(s Sheet, version string) ([]byte, error) {
 
 	pdf := fpdf.New("P", "mm", "Letter", "")
 	pdf.SetMargins(18, 18, 18)
-	pdf.SetAutoPageBreak(true, 18)
+	// Every element is positioned manually and the word grid is scaled to fit a
+	// single page, so auto page-break must stay OFF — otherwise the footer (which
+	// sits in the bottom margin) would spill onto a spurious second page.
+	pdf.SetAutoPageBreak(false, 0)
 	pdf.AddPage()
 
 	drawHeader(pdf, s)
@@ -130,9 +133,8 @@ func drawInstructions(pdf *fpdf.Fpdf, s Sheet) {
 // drawWordGrid renders the numbered word boxes in two columns. By default the
 // boxes are empty (handwriting template); when s.Words is populated, the words
 // are printed inside them. Row height is computed so the whole grid fits on the
-// page regardless of the word count (20–33 words), and auto page-break is
-// disabled during the grid so the manual absolute positioning isn't disrupted
-// mid-draw.
+// page regardless of the word count (20–33 words). Auto page-break is off for
+// the whole sheet (see Render), so the manual positioning is never disrupted.
 func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 	filled := len(s.Words) > 0
 	count := s.WordCount
@@ -155,9 +157,8 @@ func drawWordGrid(pdf *fpdf.Fpdf, s Sheet) {
 	const cols = 2
 	perCol := (count + cols - 1) / cols
 
-	pdf.SetAutoPageBreak(false, 0)
-	defer pdf.SetAutoPageBreak(true, 18)
-
+	// Auto page-break is already off for the whole sheet (see Render); the grid
+	// just needs the page height to scale row height so everything fits.
 	_, pageH := pdf.GetPageSize()
 	startX, startY := pdf.GetX(), pdf.GetY()
 

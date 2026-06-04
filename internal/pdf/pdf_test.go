@@ -39,6 +39,12 @@ func TestRenderProducesValidPDF(t *testing.T) {
 			if !bytes.Contains(out, []byte("%%EOF")) {
 				t.Fatal("PDF missing EOF marker")
 			}
+			// A backup sheet must be exactly one page — the grid is scaled to
+			// fit, and a stray second page is a layout bug. fpdf records the page
+			// count as "/Count N" in the page tree.
+			if !bytes.Contains(out, []byte("/Count 1")) {
+				t.Fatal("expected a single-page PDF (/Count 1)")
+			}
 		})
 	}
 }
