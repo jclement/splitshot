@@ -22,7 +22,8 @@ archives:
         formats: [zip]
 
 brews:
-  - repository:
+  - directory: Formula
+    repository:
       owner: jclement
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
